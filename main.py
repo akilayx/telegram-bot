@@ -3,34 +3,41 @@ import logging
 import sqlite3
 from datetime import datetime
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application, CommandHandler, ContextTypes,
+    MessageHandler, filters
+)
 import openpyxl
 from openpyxl.styles import Font, Alignment
 import tempfile
 import pandas as pd
-from flask import Flask
-from threading import Thread
+from flask import Flask, request
 
-# ----------------------------
+# -----------------------------
 # Logging
-# ----------------------------
+# -----------------------------
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ----------------------------
+# -----------------------------
 # Telegram Token
-# ----------------------------
+# -----------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 if not TELEGRAM_TOKEN:
     logger.error("TELEGRAM_TOKEN environment variable is required")
     exit(1)
 
-# ----------------------------
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+if not WEBHOOK_URL:
+    logger.error("WEBHOOK_URL environment variable is required")
+    exit(1)
+
+# -----------------------------
 # Database
-# ----------------------------
+# -----------------------------
 DB_NAME = "transactions.db"
 
 def init_database():
@@ -52,36 +59,15 @@ def init_database():
 
 init_database()
 
-# ----------------------------
-# Languages
-# ----------------------------
+# -----------------------------
+# Language support
+# -----------------------------
 LANGUAGES = {
-    "en": {
-        "start": "Welcome to Personal Finance Bot!",
-        "add_success": "Transaction added successfully!",
-        "balance": "Your current balance is: {balance}",
-        "help": "Available commands: /start, /add, /balance, /history, /export, /report, /setlang, /categories, /clear, /help",
-        "error": "An error occurred."
-    },
-    "ru": {
-        "start": "Добро пожаловать в Бот Личных Финансов!",
-        "add_success": "Транзакция успешно добавлена!",
-        "balance": "Ваш текущий баланс: {balance}",
-        "help": "Доступные команды: /start, /add, /balance, /history, /export, /report, /setlang, /categories, /clear, /help",
-        "error": "Произошла ошибка."
-    },
-    "kg": {
-        "start": "Жеке Финанс Ботко кош келиңиз!",
-        "add_success": "Транзакция ийгиликтүү кошулду!",
-        "balance": "Сиздин учурдагы баланс: {balance}",
-        "help": "Колдонмодо жеткиликтүү буйруктар: /start, /add, /balance, /history, /export, /report, /setlang, /categories, /clear, /help",
-        "error": "Ката кетти."
-    }
+    "en": {"start": "🤖 Welcome! Use /add, /balance, /history, /export, /report, /clear, /setlang, /categories, /help."},
+    "ru": {"start": "🤖 Добро пожаловать! Используйте /add, /balance, /history, /export, /report, /clear, /setlang, /categories, /help."},
+    "kg": {"start": "🤖 Кош келдиңиз! /add, /balance, /history, /export, /report, /clear, /setlang, /categories, /help."}
 }
 
-# ----------------------------
-# User language
-# ----------------------------
 def get_user_language(user_id: int) -> str:
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -93,114 +79,90 @@ def get_user_language(user_id: int) -> str:
 def set_user_language(user_id: int, language: str):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute(
-        "INSERT OR REPLACE INTO user_preferences (user_id, language) VALUES (?, ?)",
-        (user_id, language)
-    )
+    c.execute("INSERT OR REPLACE INTO user_preferences (user_id, language) VALUES (?, ?)", (user_id, language))
     conn.commit()
     conn.close()
 
-# ----------------------------
-# Handlers
-# ----------------------------
+# -----------------------------
+# Telegram Handlers
+# -----------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lang = get_user_language(update.effective_user.id)
-    await update.message.reply_text(LANGUAGES[lang]['start'])
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id)
+    await update.message.reply_text(LANGUAGES[lang]["start"])
 
+# Пример для add, balance и других команд оставим пустым, но структуру можно добавить
 async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Dummy implementation, replace with parsing logic
-    lang = get_user_language(update.effective_user.id)
-    await update.message.reply_text(LANGUAGES[lang]['add_success'])
+    await update.message.reply_text("✅ /add работает! (добавь логику)")
 
 async def show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lang = get_user_language(update.effective_user.id)
-    # Dummy balance
-    balance = 1000
-    await update.message.reply_text(LANGUAGES[lang]['balance'].format(balance=balance))
+    await update.message.reply_text("💰 /balance работает! (добавь логику)")
 
 async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Transaction history is under development.")
+    await update.message.reply_text("📋 /history работает! (добавь логику)")
 
 async def export_transactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Exporting transactions is under development.")
+    await update.message.reply_text("📊 /export работает! (добавь логику)")
 
 async def generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Generating report is under development.")
-
-async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) == 0:
-        await update.message.reply_text("Please provide language code (en/ru/kg).")
-        return
-    lang_code = context.args[0].lower()
-    if lang_code not in LANGUAGES:
-        await update.message.reply_text("Unsupported language.")
-        return
-    set_user_language(update.effective_user.id, lang_code)
-    await update.message.reply_text(f"Language set to {lang_code}.")
-
-async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Categories: Food, Transport, Bills, Other")
+    await update.message.reply_text("📈 /report работает! (добавь логику)")
 
 async def clear_transactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Clearing transactions is under development.")
+    await update.message.reply_text("🗑️ /clear работает! (добавь логику)")
+
+async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🌐 /setlang работает! (добавь логику)")
+
+async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📂 /categories работает! (добавь логику)")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lang = get_user_language(update.effective_user.id)
-    await update.message.reply_text(LANGUAGES[lang]['help'])
+    await update.message.reply_text("❓ /help работает! (добавь логику)")
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("File handling is under development.")
+    await update.message.reply_text("📂 Файл обработан! (добавь логику)")
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.warning(f'Update {update} caused error {context.error}')
 
-# ----------------------------
-# Main bot
-# ----------------------------
-def main() -> None:
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+# -----------------------------
+# Flask + Webhook
+# -----------------------------
+app = Flask(__name__)
+application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Commands
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("add", add_transaction))
-    application.add_handler(CommandHandler("balance", show_balance))
-    application.add_handler(CommandHandler("history", show_history))
-    application.add_handler(CommandHandler("export", export_transactions))
-    application.add_handler(CommandHandler("report", generate_report))
-    application.add_handler(CommandHandler("setlang", set_language))
-    application.add_handler(CommandHandler("categories", show_categories))
-    application.add_handler(CommandHandler("clear", clear_transactions))
-    application.add_handler(CommandHandler("help", help_command))
+# Register handlers
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("add", add_transaction))
+application.add_handler(CommandHandler("balance", show_balance))
+application.add_handler(CommandHandler("history", show_history))
+application.add_handler(CommandHandler("export", export_transactions))
+application.add_handler(CommandHandler("report", generate_report))
+application.add_handler(CommandHandler("clear", clear_transactions))
+application.add_handler(CommandHandler("setlang", set_language))
+application.add_handler(CommandHandler("categories", show_categories))
+application.add_handler(CommandHandler("help", help_command))
+application.add_handler(MessageHandler(
+    filters.Document.FileExtension("xlsx") | filters.Document.FileExtension("xls") | filters.Document.FileExtension("csv"),
+    handle_file
+))
+application.add_error_handler(error_handler)
 
-    # File handler
-    application.add_handler(
-        MessageHandler(
-            filters.Document.FileExtension(["xlsx", "xls", "csv"]),
-            handle_file
-        )
-    )
+@app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    application.update_queue.put(update)
+    return "OK"
 
-    # Error handler
-    application.add_error_handler(error_handler)
-
-    logger.info("Bot is starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
-
-# ----------------------------
-# Flask server for Render
-# ----------------------------
-app = Flask('')
-
-@app.route('/')
+@app.route("/")
 def home():
     return "Bot is running!"
 
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+# -----------------------------
+# Main
+# -----------------------------
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(application.bot.set_webhook(WEBHOOK_URL))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
-# ----------------------------
-# Start both
-# ----------------------------
-if __name__ == '__main__':
-    Thread(target=run_flask).start()
-    main()
